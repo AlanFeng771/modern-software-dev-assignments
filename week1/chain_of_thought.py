@@ -8,7 +8,32 @@ load_dotenv()
 NUM_RUNS_TIMES = 5
 
 # TODO: Fill this in!
-YOUR_SYSTEM_PROMPT = ""
+YOUR_SYSTEM_PROMPT = """
+Solve this problem, then give the final answer on the last line as "Answer: <number>"
+Make sure you reason through the problem using the following steps:
+
+3^{n} (mod 100), where n can be any integer
+
+Step 1: Find the repeating cycle
+3^1  mod 100 = 3
+3^2  mod 100 = 9
+3^3  mod 100 = 27
+3^4  mod 100 = 81
+3^5  mod 100 = 43   (243 → 43)
+3^6  mod 100 = 29
+...
+3^{20} (mod 100) = 1
+You can observe that the cycle length is 20.
+
+Step 2: Reduce the exponent
+For example, n = 123 can be expressed as 20 (the cycle length from Step 1) * 6 + 3.
+
+Step 3: Compute the reduced power
+From Step 2, we know that 3^{123} (mod 100) = 3^{3} (mod 100).
+Compute the result of this smaller power.
+Output "Answer: 27"
+
+"""
 
 
 USER_PROMPT = """

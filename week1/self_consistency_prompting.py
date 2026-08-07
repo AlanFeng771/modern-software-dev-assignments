@@ -9,7 +9,19 @@ load_dotenv()
 NUM_RUNS_TIMES = 5
 
 # TODO: Fill this in! Try to get as close to 100% correctness across all runs as possible.
-YOUR_SYSTEM_PROMPT = ""
+YOUR_SYSTEM_PROMPT = """
+Solve this problem, then give the final answer on the last line as "Answer: <number>".
+Reason through the problem using the following steps:
+
+Step 1: Find the position of the first stop and the second stop relative to the starting point.
+Example:
+"first stop was after 10 miles" tells us the first stop is 10 miles from the start.
+"second stop was 20 miles before the end of the trip" — if the total trip is 50 miles, then the second stop is 30 miles from the start (50 - 20).
+
+Step 2: Find the difference between the second stop and the first stop.
+30 - 10 = 20
+Answer: 20
+"""
 
 USER_PROMPT = """
 Solve this problem, then give the final answer on the last line as "Answer: <number>".

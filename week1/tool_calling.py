@@ -70,7 +70,12 @@ TOOL_REGISTRY: Dict[str, Callable[..., str]] = {
 # ==========================
 
 # TODO: Fill this in!
-YOUR_SYSTEM_PROMPT = ""
+YOUR_SYSTEM_PROMPT = """
+When asked to call the tool, output only the following JSON format for the tool call, with no additional text or explanation:
+
+{"tool": "output_every_func_return_type", "args": {"file_path": ""}}
+
+file_path: an empty string means the tool should analyze this file itself. Otherwise, provide a relative or absolute path to a Python file. Defaults to an empty string if not specified."""
 
 
 def resolve_path(p: str) -> str:
