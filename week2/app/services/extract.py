@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-import os
 import re
 from typing import List
-import json
-from typing import Any
-from ollama import chat
-from dotenv import load_dotenv
+from ollama import ResponseError, chat
+from pydantic import BaseModel, Field, ValidationError
 
-load_dotenv()
+from .. import config
+
+
+class LLMServiceError(Exception):
+    """Raised when the Ollama service is unreachable or returns an error."""
 
 BULLET_PREFIX_PATTERN = re.compile(r"^\s*([-*•]|\d+\.)\s+")
 KEYWORD_PREFIXES = (
@@ -63,6 +64,68 @@ def extract_action_items(text: str) -> List[str]:
             continue
         seen.add(lowered)
         unique.append(item)
+    return unique
+
+
+DEFAULT_OLLAMA_MODEL = config.OLLAMA_MODEL
+
+# Drives WHAT the model does (task); schema below drives the output shape.
+LLM_SYSTEM_PROMPT = (
+    "You are an assistant that parses free-form notes provided by the user "
+    "and converts them into a structured list of action items."
+)
+
+
+# Ollama `format` schema: enforces output JSON shape via constrained decoding.
+class ActionItemsResponse(BaseModel):
+    action_items: List[str] = Field(
+        description=(
+            "Concrete, actionable tasks extracted from the notes, each phrased "
+            "as a short imperative sentence (e.g. 'Set up database'). "
+            "Empty list if no action items are found."
+        )
+    )
+
+
+def extract_action_items_llm(text: str, model: str | None = None) -> List[str]:
+    """LLM-powered alternative to extract_action_items(), using Ollama structured outputs."""
+    stripped_text = text.strip()
+    if not stripped_text:
+        return []
+
+    # Service-level failures (Ollama unreachable, model error) are distinct from
+    # parse failures below: they mean "couldn't ask the model" rather than "the
+    # model found nothing", so they're raised instead of swallowed to an empty list.
+    try:
+        response = chat(
+            model=model or DEFAULT_OLLAMA_MODEL,
+            messages=[
+                {"role": "system", "content": LLM_SYSTEM_PROMPT},
+                {"role": "user", "content": stripped_text},
+            ],
+            format=ActionItemsResponse.model_json_schema(),
+            options={"temperature": 0},
+        )
+    except (ConnectionError, ResponseError) as exc:
+        raise LLMServiceError(str(exc)) from exc
+
+    try:
+        parsed = ActionItemsResponse.model_validate_json(response.message.content)
+    except (ValidationError, TypeError):
+        return []
+
+    # Deduplicate while preserving order
+    seen: set[str] = set()
+    unique: List[str] = []
+    for item in parsed.action_items:
+        cleaned = item.strip()
+        if not cleaned:
+            continue
+        lowered = cleaned.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        unique.append(cleaned)
     return unique
 
 

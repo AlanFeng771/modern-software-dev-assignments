@@ -1,24 +1,32 @@
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
-from typing import Optional
+from contextlib import contextmanager
+from typing import Iterator, Optional
+
+from . import config
 
 
-BASE_DIR = Path(__file__).resolve().parents[1]
-DATA_DIR = BASE_DIR / "data"
-DB_PATH = DATA_DIR / "app.db"
+class DatabaseError(Exception):
+    """Raised when a database operation fails, wrapping the underlying sqlite3.Error."""
 
 
 def ensure_data_directory_exists() -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    config.DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def get_connection() -> sqlite3.Connection:
+@contextmanager
+def get_connection() -> Iterator[sqlite3.Connection]:
     ensure_data_directory_exists()
-    connection = sqlite3.connect(DB_PATH)
+    connection = sqlite3.connect(config.DB_PATH)
     connection.row_factory = sqlite3.Row
-    return connection
+    connection.execute("PRAGMA foreign_keys = ON")
+    try:
+        yield connection
+    except sqlite3.Error as exc:
+        raise DatabaseError(str(exc)) from exc
+    finally:
+        connection.close()
 
 
 def init_db() -> None:

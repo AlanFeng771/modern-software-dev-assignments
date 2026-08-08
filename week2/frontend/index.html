@@ -7,10 +7,12 @@
     <style>
       body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; margin: 2rem auto; max-width: 800px; padding: 0 1rem; }
       h1 { font-size: 1.5rem; }
+      h2 { font-size: 1.1rem; margin-top: 2rem; }
       textarea { width: 100%; min-height: 160px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace; }
       button { padding: 0.5rem 1rem; }
       .items { margin-top: 1rem; }
       .item { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
+      .note { padding: 0.5rem 0; border-bottom: 1px solid #e5e7eb; }
       .muted { color: #6b7280; font-size: 0.875rem; }
       .row { display: flex; gap: 0.5rem; align-items: center; }
     </style>
@@ -24,32 +26,46 @@
     <div class="row">
       <label class="row"><input id="save_note" type="checkbox" checked /> Save as note</label>
       <button id="extract">Extract</button>
+      <button id="extract-llm">Extract LLM</button>
     </div>
 
     <div class="items" id="items"></div>
 
+    <h2>Notes</h2>
+    <div class="row">
+      <button id="list-notes">List Notes</button>
+    </div>
+    <div class="items" id="notes"></div>
+
     <script>
       const $ = (sel) => document.querySelector(sel);
       const itemsEl = $('#items');
-      const btn = $('#extract');
-      btn.addEventListener('click', async () => {
+      const notesEl = $('#notes');
+
+      function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      async function runExtract(endpoint) {
         const text = $('#text').value;
         const save = $('#save_note').checked;
         itemsEl.textContent = 'Extracting...';
         try {
-          const res = await fetch('/action-items/extract', {
+          const res = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text, save_note: save }),
           });
-          if (!res.ok) throw new Error('Request failed');
           const data = await res.json();
+          if (!res.ok) throw new Error(data.detail || 'Request failed');
           if (!data.items || data.items.length === 0) {
             itemsEl.innerHTML = '<p class="muted">No action items found.</p>';
             return;
           }
           itemsEl.innerHTML = data.items.map(it => (
-            `<div class="item"><input type="checkbox" data-id="${it.id}" /> <span>${it.text}</span></div>`
+            `<div class="item"><input type="checkbox" data-id="${it.id}" /> <span>${escapeHtml(it.text)}</span></div>`
           )).join('');
           itemsEl.querySelectorAll('input[type="checkbox"]').forEach(cb => {
             cb.addEventListener('change', async (e) => {
@@ -63,12 +79,31 @@
           });
         } catch (err) {
           console.error(err);
-          itemsEl.textContent = 'Error extracting items';
+          itemsEl.textContent = `Error extracting items: ${err.message}`;
+        }
+      }
+
+      $('#extract').addEventListener('click', () => runExtract('/action-items/extract'));
+      $('#extract-llm').addEventListener('click', () => runExtract('/action-items/extract-llm'));
+
+      $('#list-notes').addEventListener('click', async () => {
+        notesEl.textContent = 'Loading...';
+        try {
+          const res = await fetch('/notes');
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail || 'Request failed');
+          if (data.length === 0) {
+            notesEl.innerHTML = '<p class="muted">No notes yet.</p>';
+            return;
+          }
+          notesEl.innerHTML = data.map(note => (
+            `<div class="note"><div>${escapeHtml(note.content)}</div><div class="muted">${escapeHtml(note.created_at)}</div></div>`
+          )).join('');
+        } catch (err) {
+          console.error(err);
+          notesEl.textContent = `Error loading notes: ${err.message}`;
         }
       });
-
     </script>
   </body>
   </html>
-
-

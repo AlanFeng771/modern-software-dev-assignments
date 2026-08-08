@@ -1,19 +1,35 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import AsyncIterator
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .db import init_db
+from .db import DatabaseError, init_db
 from .routers import action_items, notes
-from . import db
+from .services.extract import LLMServiceError
 
-init_db()
 
-app = FastAPI(title="Action Item Extractor")
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    init_db()
+    yield
+
+
+app = FastAPI(title="Action Item Extractor", lifespan=lifespan)
+
+
+@app.exception_handler(DatabaseError)
+def handle_database_error(request: Request, exc: DatabaseError) -> JSONResponse:
+    return JSONResponse(status_code=500, content={"detail": "Database error"})
+
+
+@app.exception_handler(LLMServiceError)
+def handle_llm_service_error(request: Request, exc: LLMServiceError) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": "LLM service unavailable"})
 
 
 @app.get("/", response_class=HTMLResponse)
