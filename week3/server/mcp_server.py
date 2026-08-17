@@ -1,18 +1,24 @@
 from typing import Any
+import os
 import httpx
 import argparse
+from typing import Annotated
+from pydantic import Field
 from mcp.server import MCPServer
 from github_errors import handle_github_errors
+from api_key_auth import build_auth_kwargs
 import logging
 logger = logging.getLogger(__name__)
 
 
-mcp = MCPServer(name="github_repos")
+# Only takes effect over HTTP transport, and only if MCP_API_KEY is set — see api_key_auth.py.
+_resource_url = os.environ.get("MCP_RESOURCE_URL", "http://127.0.0.1:8000/mcp")
+mcp = MCPServer(name="github_repos", **build_auth_kwargs(_resource_url))
 
 
 @mcp.tool()
 @handle_github_errors({422: "Your search keyword could not be processed. Please try a simpler or different keyword."})
-async def get_useful_repositories(keyword: str, max_repositories: int = 10) -> dict[str, Any]:
+async def get_useful_repositories(keyword: Annotated[str, Field(min_length=2, description="The search keyword for finding repositories.")], max_repositories: Annotated[int, Field(ge=1, le=100, description="The maximum number of repositories to return.")] = 10) -> dict[str, Any]:
     """Lists GitHub repositories matching a given `keyword`, including a short description, plus the repository's `owner` and `repo`, which can be passed to `get_repository_info` for detailed information."""
     headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
     async with httpx.AsyncClient() as client:
@@ -42,7 +48,7 @@ async def get_useful_repositories(keyword: str, max_repositories: int = 10) -> d
 
 @mcp.tool()
 @handle_github_errors({404: "Could not find repository {owner}/{repo}."})
-async def get_repository_info(owner: str, repo: str) -> dict[str, Any]:
+async def get_repository_info(owner: Annotated[str, Field(min_length=1, description="The owner of the repository.")], repo: Annotated[str, Field(min_length=1, description="The name of the repository.")]) -> dict[str, Any]:
     """Fetches detailed information about a specific GitHub repository, including its `description`, `stars`, `forks`, and `open_issues` count."""
     headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
     async with httpx.AsyncClient() as client:

@@ -15,8 +15,8 @@ Usage flow: User asks "any good repos for XXX?" → model calls Tool 1 to get a 
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `keyword` | str | required | Keyword to search for repositories |
-| `max_repository_output` | int | optional (default 10) | Maximum number of repositories to return |
+| `keyword` | str (min length 2) | required | Keyword to search for repositories |
+| `max_repositories` | int (1–100) | optional (default 10) | Maximum number of repositories to return |
 
 **GitHub API Endpoint**
 `GET https://api.github.com/search/repositories`
@@ -53,8 +53,8 @@ Query: `q={keyword}`, `sort=stars`, `order=desc`
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `owner` | str | required | The GitHub username or organization that owns the repository |
-| `repo` | str | required | The repository name |
+| `owner` | str (min length 1) | required | The GitHub username or organization that owns the repository |
+| `repo` | str (min length 1) | required | The repository name |
 
 **GitHub API Endpoint**
 `GET https://api.github.com/repos/{owner}/{repo}`
@@ -94,3 +94,4 @@ Query: `q={keyword}`, `sort=stars`, `order=desc`
 - **Search API and Core API have separate rate-limit buckets**: The Search API (`/search/*`) has a much stricter unauthenticated limit (10 req/min) than the Core API (60 req/hour). Both tools must handle their own bucket's limit — the same header-reading logic works for both, since GitHub automatically returns the correct bucket's info for whichever endpoint was called.
 - **404 vs. 422**: `/repos/{owner}/{repo}` treats owner/repo as a path parameter, so a nonexistent repo returns 404. `/search/*` treats the query as a filter, so an invalid/nonexistent target in the query returns 422 instead (verified empirically). The two endpoints cannot share the same error-handling logic.
 - **304 is not handled**: No ETag/conditional-request caching is implemented (out of scope for this assignment), so 304 cannot occur under the current design and is therefore excluded from error handling.
+- **Input validation via Pydantic `Annotated`/`Field` constraints**: each parameter's type hint carries validation rules (e.g. `max_repositories: Annotated[int, Field(ge=1, le=100)]`), which the MCP SDK enforces at the protocol-dispatch layer — before the tool function body (and `handle_github_errors`) ever runs — rejecting bad input with a structured Pydantic validation error, verified empirically via the MCP Inspector. Calling the tool function directly in Python (bypassing the MCP protocol layer, e.g. in `test_manual.py`) does **not** trigger this validation, since it's the SDK's request-dispatch code that reads the `Field` metadata, not Python itself.

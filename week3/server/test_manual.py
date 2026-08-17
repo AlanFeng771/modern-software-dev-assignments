@@ -8,8 +8,8 @@ from mcp_server import get_repository_info
 
 
 async def main():
-    # result = await get_useful_repositories(keyword="agent skills", max_repositories=5)
-    result = await get_repository_info(owner="obra", repo="superpowers")
+    result = await get_useful_repositories(keyword="", max_repositories=0)
+    # result = await get_repository_info(owner="obra", repo="superpowers")
     print(result)
 
 
