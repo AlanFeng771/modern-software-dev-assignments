@@ -4,11 +4,16 @@ async function fetchJSON(url, options) {
   return res.json();
 }
 
+let notesRequestId = 0;
+
 async function loadNotes(query) {
-  const list = document.getElementById('notes');
-  list.innerHTML = '';
+  const requestId = ++notesRequestId;
   const url = query ? `/notes/search?q=${encodeURIComponent(query)}` : '/notes/';
   const notes = await fetchJSON(url);
+  if (requestId !== notesRequestId) return; // a newer request already superseded this one
+
+  const list = document.getElementById('notes');
+  list.innerHTML = '';
   for (const n of notes) {
     const li = document.createElement('li');
     li.textContent = `${n.title}: ${n.content}`;

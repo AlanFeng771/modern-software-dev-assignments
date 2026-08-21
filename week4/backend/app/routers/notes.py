@@ -8,6 +8,16 @@ from ..schemas import NoteCreate, NoteRead
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 
+LIKE_ESCAPE_CHAR = "\\"
+
+
+def _escape_like(value: str) -> str:
+    return (
+        value.replace(LIKE_ESCAPE_CHAR, LIKE_ESCAPE_CHAR * 2)
+        .replace("%", f"{LIKE_ESCAPE_CHAR}%")
+        .replace("_", f"{LIKE_ESCAPE_CHAR}_")
+    )
+
 
 @router.get("/", response_model=list[NoteRead])
 def list_notes(db: Session = Depends(get_db)) -> list[NoteRead]:
@@ -29,10 +39,13 @@ def search_notes(q: str | None = None, db: Session = Depends(get_db)) -> list[No
     if not q:
         rows = db.execute(select(Note)).scalars().all()
     else:
-        pattern = f"%{q}%"
+        pattern = f"%{_escape_like(q)}%"
         rows = (
             db.execute(
-                select(Note).where((Note.title.ilike(pattern)) | (Note.content.ilike(pattern)))
+                select(Note).where(
+                    (Note.title.ilike(pattern, escape=LIKE_ESCAPE_CHAR))
+                    | (Note.content.ilike(pattern, escape=LIKE_ESCAPE_CHAR))
+                )
             )
             .scalars()
             .all()

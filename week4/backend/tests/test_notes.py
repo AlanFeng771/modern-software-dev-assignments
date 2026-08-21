@@ -37,3 +37,17 @@ def test_search_notes_no_match(client):
     r = client.get("/notes/search", params={"q": "nonexistent-term"})
     assert r.status_code == 200
     assert r.json() == []
+
+
+def test_search_notes_escapes_like_wildcards(client):
+    client.post("/notes/", json={"title": "Discount", "content": "Save 50% today"})
+    client.post("/notes/", json={"title": "Other", "content": "Nothing special here"})
+
+    r = client.get("/notes/search", params={"q": "50%"})
+    assert r.status_code == 200
+    items = r.json()
+    assert [n["title"] for n in items] == ["Discount"]
+
+    r = client.get("/notes/search", params={"q": "_"})
+    assert r.status_code == 200
+    assert r.json() == []
