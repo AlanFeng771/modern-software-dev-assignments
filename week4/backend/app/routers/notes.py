@@ -1,5 +1,3 @@
-from typing import Optional
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -26,13 +24,16 @@ def create_note(payload: NoteCreate, db: Session = Depends(get_db)) -> NoteRead:
     return NoteRead.model_validate(note)
 
 
-@router.get("/search/", response_model=list[NoteRead])
-def search_notes(q: Optional[str] = None, db: Session = Depends(get_db)) -> list[NoteRead]:
+@router.get("/search", response_model=list[NoteRead])
+def search_notes(q: str | None = None, db: Session = Depends(get_db)) -> list[NoteRead]:
     if not q:
         rows = db.execute(select(Note)).scalars().all()
     else:
+        pattern = f"%{q}%"
         rows = (
-            db.execute(select(Note).where((Note.title.contains(q)) | (Note.content.contains(q))))
+            db.execute(
+                select(Note).where((Note.title.ilike(pattern)) | (Note.content.ilike(pattern)))
+            )
             .scalars()
             .all()
         )
